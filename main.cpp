@@ -9,8 +9,8 @@ int main() {
     constexpr SOCK_FAM fam = IPV4;
     constexpr SOCK_TYPE sockType = TCP;
     const auto args = SocketArgs(fam, sockType);
-    auto sock = SSocket(args);
-    sock.listen();
+    //auto sock = SSocket(args);
+    //sock.listen();
 
     return 0;
 }
