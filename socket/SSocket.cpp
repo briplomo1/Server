@@ -2,13 +2,28 @@
 // Created by b1n4r33 on 3/10/25.
 //
 
-#include "Socket.h"
-
-#include <cstring>
+#include "SSocket.h"
 #include <iostream>
-#include <ostream>
-#include <sys/socket.h>
-#include <fcntl.h>
+
+#ifdef linux
+
+    #include <cstring>
+    #include <ostream>
+    #include <sys/socket.h>
+    #include <fcntl.h>
+
+#endif
+#ifdef _WIN32
+
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+
+#endif
+
+#ifdef linux
+/*
+ * Socket implementation if in linux.Socket implementation depends on linux system implementation
+ */
 
 int Socket::handle_connection(int client_socket) const {
     // Number of bytes sent from new connection
@@ -85,6 +100,80 @@ int Socket::start() {
     return 0;
 
 }
+
+#endif
+
+
+/*
+ * Method implementations if in windows. Method implementations will depend on windows APIs
+ */
+#ifdef _WIN32
+
+SSocket::SSocket(const SocketArgs args): args(args), sock(INVALID_SOCKET), port(0) {
+    // WSA version max version that can be used
+    constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
+    status = WSAStartup(version, &wsaData);
+    // Find WSA DLL
+    if (status < 0) {
+        std::cerr << "WSAStartup failed: " << status << std::endl;
+        throw std::runtime_error("WSAStartup failed: " + std::to_string(status));
+    }
+    // Check DLL version
+    if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
+        std::cerr << "WSAStartup failed: wrong version" << std::endl;
+        throw std::runtime_error("WSAStartup failed: Wrong version.");
+    }
+    std::cout << "WSAStartup successful." << std::endl;
+    // Create socket descriptor
+    sock = socket(args.family, args.type, 0);
+}
+
+SSocket::SSocket(const SocketArgs args, std::nothrow_t): args(args), sock(INVALID_SOCKET), port(0) {
+    // WSA version max version that can be used
+    constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
+    status = WSAStartup(version, &wsaData);
+    // Find WSA DLL
+    if (status < 0) {
+        std::cerr << "WSAStartup failed: " << status << std::endl;
+        return;
+    }
+    // Check DLL version
+    if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
+        std::cerr << "WSAStartup failed: wrong version" << std::endl;
+        return;
+    }
+    std::cout << "WSAStartup successful." << std::endl;
+    // Create socket descriptor
+    sock = socket(args.family, args.type, 0);
+    std::cout << "Socket created successfully." << std::endl;
+}
+
+
+int SSocket::bind(int port) {
+
+
+    return 0;
+}
+
+
+int SSocket::listen() {
+
+
+    return 0;
+}
+
+SSocket::~SSocket() {
+    closesocket(sock);
+    WSACleanup();
+}
+
+
+
+
+
+
+
+#endif
 
 
 

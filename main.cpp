@@ -1,13 +1,16 @@
 #include <iostream>
-
-#include "Socket.h"
+#include "socket/SocketArgs.h"
+#include "socket/SSocket.h"
 
 
 // TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 int main() {
-    auto socket = Socket(TCP, 8080, std::vector{NON_BLOCKING}, true);
-    socket.start();
+    constexpr SOCK_FAM fam = IPV4;
+    constexpr SOCK_TYPE sockType = TCP;
+    const auto args = SocketArgs(fam, sockType);
+    auto sock = SSocket(args);
+    sock.listen();
 
     return 0;
 }

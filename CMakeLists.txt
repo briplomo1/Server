@@ -4,12 +4,11 @@ project(Test)
 set(CMAKE_CXX_STANDARD 20)
 
 add_executable(Test main.cpp
-        server.cpp
-        server.h
-        Socket.cpp
-        Socket.h
-        Request.cpp
-        Request.h
-        Response.cpp
-        Response.h
+        socket/SSocket.cpp
+        socket/SSocket.h
+        http/Request.cpp
+        http/Request.h
+        http/Response.cpp
+        http/Response.h
+        socket/SocketArgs.h
 )
