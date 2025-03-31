@@ -104,11 +104,10 @@ int Socket::start() {
  */
 #ifdef _WIN32
 
-namespace Waiter::Networking
-{
-    Socket::Socket(const SocketArgs args): sockArgs(args), sock(INVALID_SOCKET), sockAddr(SOCKADDR_STORAGE()),
-    isReuseAddress(false), isNonBlocking(false), wsaData(WSAData()) {
+namespace Waiter::Networking {
 
+    Socket::Socket(const SocketArgs args): buffer{}, sockArgs(args), sock(INVALID_SOCKET), sockAddr(SOCKADDR_STORAGE()),
+    isReuseAddress(false), isNonBlocking(false), hints(), addressList(nullptr), wsaData(WSAData()) {
         // WSA version max version that can be used
         constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
         status = WSAStartup(version, &wsaData);
@@ -129,7 +128,7 @@ namespace Waiter::Networking
         sockAddr.ss_family = sockArgs.family;
         // Create socket descriptor
         sock = socket(args.family, args.type, args.protocol ? args.protocol : 0);
-        if (sock == INVALID_SOCKET){
+        if (sock == INVALID_SOCKET) {
             std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
             WSACleanup();
             throw std::runtime_error("Socket creation failed: " + WSAGetLastError());
@@ -137,9 +136,8 @@ namespace Waiter::Networking
         std::cout << "Socket created successfully." << std::endl;
     }
 
-    Socket::Socket(const SocketArgs args, std::nothrow_t): sockArgs(args), sock(INVALID_SOCKET), sockAddr(SOCKADDR_STORAGE()),
-    isReuseAddress(false), isNonBlocking(false), wsaData(WSAData()) {
-
+    Socket::Socket(const SocketArgs args, std::nothrow_t): buffer{}, sockArgs(args), sock(INVALID_SOCKET),
+    sockAddr(SOCKADDR_STORAGE()), isReuseAddress(false), isNonBlocking(false), hints(), addressList(nullptr), wsaData(WSAData()) {
         // WSA version max version that can be used
         constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
         status = WSAStartup(version, &wsaData);
@@ -158,9 +156,9 @@ namespace Waiter::Networking
         std::cout << "WSAStartup successful." << std::endl;
         // Set family for protocol independent socket address info
         sockAddr.ss_family = sockArgs.family;
-        // Create socket descriptor
+        // Create socket descriptor. In windows socket is never negative. Not true for linux
         sock = socket(args.family, args.type, 0);
-        if (sock == INVALID_SOCKET){
+        if (sock == INVALID_SOCKET) {
             std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
             WSACleanup();
             return;
@@ -169,10 +167,34 @@ namespace Waiter::Networking
     }
 
 
-    int Socket::bindSocket(int port) {
-        status = bind()
+    int Socket::bindSocket(const std::string &address=DEFAULT_ADDRESS, const std::string &port=DEFAULT_PORT) {
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = sockArgs.family;
+        hints.ai_socktype = sockArgs.type;
+        hints.ai_flags = AI_NUMERICHOST | AI_PASSIVE;
+        status = getaddrinfo(address.data(), port.data(), &hints, &addressList);
+        if (status != 0) {
+            fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(status));
+            WSACleanup();
+            throw std::runtime_error("getaddrinfo failed: " + std::to_string(status));
+        }
+        AddressInfo *addressPtr = addressList;
+        for (int i = 0; addressPtr != nullptr; i++, addressPtr++) {
+            if (i == FD_SETSIZE) {
+                printf("bindSocket failed getting address info. Too many addresses returned.\n");
+                break;
+            }
+            // Ignore address if family is not IPV4 or IPV6
+            if (addressPtr->ai_family != PF_INET && addressPtr->ai_family != PF_INET6) {
+                printf("Address family for found address not supported.\n");
+                continue;
+            }
+
+
+        }
 
         return 0;
+
     }
 
 

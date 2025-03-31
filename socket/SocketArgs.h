@@ -15,15 +15,15 @@
     #include <windows.h>
 
 #endif
+#include <string>
 
 
 namespace Waiter::Networking {
 
-    typedef short SOCK_PORT;
-
     enum SOCK_FAM {
         IPV4 = AF_INET,
         IPV6 = AF_INET6,
+        UNSPECIFIED = AF_UNSPEC,
         BLUETOOTH =
         #ifdef linux
             AF_BLUETOOTH // Bluetooth socket type exclusive to linux
@@ -41,7 +41,6 @@ namespace Waiter::Networking {
 
     enum SOCK_PROTOCOL {
         DEFAULT = 0,
-
     };
 
 
@@ -50,9 +49,9 @@ namespace Waiter::Networking {
         SOCK_FAM family;
         SOCK_TYPE type;
         SOCK_PROTOCOL protocol;
-        SOCK_PORT port;
+        std::string port;
 
-        SocketArgs(const SOCK_FAM family, const SOCK_TYPE type, const SOCK_PROTOCOL protocol, const SOCK_PORT port) : family(
+        SocketArgs(const SOCK_FAM family, const SOCK_TYPE type, const SOCK_PROTOCOL protocol, const std::string &port) : family(
             family), type(type), protocol(protocol), port(port) {}
 
     };
