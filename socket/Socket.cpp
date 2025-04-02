@@ -106,8 +106,10 @@ int Socket::start() {
 
 namespace Waiter::Networking {
 
-    Socket::Socket(const SocketArgs args): buffer{}, sockArgs(args), sock(INVALID_SOCKET), sockAddr(SOCKADDR_STORAGE()),
-    isReuseAddress(false), isNonBlocking(false), hints(), addressList(nullptr), wsaData(WSAData()) {
+    Socket::Socket(const std::string &address, const SOCK_FAM addressFamily, const SOCK_TYPE socketType, const SOCK_PROTOCOL socketProtocol=DEFAULT):
+    addressFamily(addressFamily), socketType(socketType), protocol(socketProtocol), addresses(std::vector<AddressInfo>()),
+    sockets(std::vector<SocketDescriptor>()) {
+        int status=0;
         // WSA version max version that can be used
         constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
         status = WSAStartup(version, &wsaData);
@@ -124,6 +126,10 @@ namespace Waiter::Networking {
             throw std::runtime_error("WSAStartup failed: Wrong version.");
         }
         std::cout << "WSAStartup successful." << std::endl;
+
+        // TODO: get IPV4 and IPV6 addresses
+        // TODO: create sockets
+
         // Set family for protocol independent socket address info
         sockAddr.ss_family = sockArgs.family;
         // Create socket descriptor
@@ -136,17 +142,21 @@ namespace Waiter::Networking {
         std::cout << "Socket created successfully." << std::endl;
     }
 
-    Socket::Socket(const SocketArgs args, std::nothrow_t): buffer{}, sockArgs(args), sock(INVALID_SOCKET),
-    sockAddr(SOCKADDR_STORAGE()), isReuseAddress(false), isNonBlocking(false), hints(), addressList(nullptr), wsaData(WSAData()) {
+    Socket::Socket(const std::string &address, const SOCK_FAM addressFamily, const SOCK_TYPE socketType, const SOCK_PROTOCOL socketProtocol=DEFAULT, std::nothrow_t):
+    addressFamily(addressFamily), socketType(socketType), protocol(socketProtocol), addresses(std::vector<AddressInfo>()),
+    sockets(std::vector<SocketDescriptor>()) {
+        int status = 0;
         // WSA version max version that can be used
         constexpr WORD version = MAKEWORD(2, 2); // Version 2.2
         status = WSAStartup(version, &wsaData);
+
         // Find WSA DLL
         if (status < 0) {
             std::cerr << "WSAStartup failed: " << status << std::endl;
             WSACleanup();
             return;
         }
+
         // Check DLL version
         if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
             std::cerr << "WSAStartup failed: wrong version" << std::endl;
@@ -154,8 +164,10 @@ namespace Waiter::Networking {
             return;
         }
         std::cout << "WSAStartup successful." << std::endl;
+
         // Set family for protocol independent socket address info
-        sockAddr.ss_family = sockArgs.family;
+        sockAddr.ss_family = addressFamily;
+
         // Create socket descriptor. In windows socket is never negative. Not true for linux
         sock = socket(args.family, args.type, 0);
         if (sock == INVALID_SOCKET) {
@@ -168,11 +180,7 @@ namespace Waiter::Networking {
 
 
     int Socket::bindSocket(const std::string &address=DEFAULT_ADDRESS, const std::string &port=DEFAULT_PORT) {
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = sockArgs.family;
-        hints.ai_socktype = sockArgs.type;
-        hints.ai_flags = AI_NUMERICHOST | AI_PASSIVE;
-        status = getaddrinfo(address.data(), port.data(), &hints, &addressList);
+
         if (status != 0) {
             fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(status));
             WSACleanup();
@@ -194,35 +202,34 @@ namespace Waiter::Networking {
         }
 
         return 0;
-
     }
 
-
-    int Socket::listen() {
-
-
-        return 0;
+    /**
+     * Makes use of {@link getaddrinfo} to retrieve all sockets which in turn uses {@link SOCK_FAM}, {@link SOCK_TYPE},
+     * and a ANSI string network address to derive the IPv6 and IPv4 addresses.
+     * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-getaddrinfo">getaddrinfo function Windows</a>
+     * Setting the {@link SOCK_FAM} to {@link IP_UNSPECIFIED} will populate {@link sockets} with the IPV4 and IPV6 equivalents
+     * of the given address, thereby using a dual stack sockets. Internally will use IPV6 addresses always with a mapping to
+     * a IPV4 address for addressing IPV4 socket addresses.
+     */
+    void Socket::getAddresses(AddressInfo* addressesReturn, const std::string &address, const SOCK_FAM family, const SOCK_TYPE socketType, const std::string &port) {
+        AddressInfo hints = {};
+        hints.ai_family = family;
+        hints.ai_socktype = socketType;
+        hints.ai_flags = AI_NUMERICHOST | AI_PASSIVE; // TODO: AI_PASSIVE only for server
+        if (getaddrinfo(address.data(), port.data(), &hints, &addressesReturn) < 0) {
+            std::cerr << "Get addresses for supplied address failed: " << std::endl;
+        }
     }
 
     Socket::~Socket() {
-        closesocket(sock);
+        for (const SocketDescriptor sock: sockets) {
+            closesocket(sock);
+        }
         WSACleanup();
     }
 
-    void Socket::setReuseAddress(const bool value){
-        // SOL_SOCKET are protocol independent options
-        status = setsockopt(sock, SOL_SOCKET SO_EXCLUSIVEADDRUSE, (char*) &)
-        this->isReuseAddress = value;
-    }
-
-    void Socket::setNonBlocking(const bool value)
-    {
-        this->isNonBlocking = value;
-    }
-
-    SocketArgs Socket::getSockArgs() const { return this->sockArgs; }
-
-    SocketDescriptor Socket::getSockDescriptor() const { return this->sock; }
+    std::vector<SocketDescriptor> Socket::getSockets() const { return this->sockets; }
 
 }
 

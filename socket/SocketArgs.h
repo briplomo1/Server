@@ -23,7 +23,7 @@ namespace Waiter::Networking {
     enum SOCK_FAM {
         IPV4 = AF_INET,
         IPV6 = AF_INET6,
-        UNSPECIFIED = AF_UNSPEC,
+        IP_UNSPECIFIED = AF_UNSPEC,
         BLUETOOTH =
         #ifdef linux
             AF_BLUETOOTH // Bluetooth socket type exclusive to linux
@@ -43,19 +43,9 @@ namespace Waiter::Networking {
         DEFAULT = 0,
     };
 
+    typedef std::string SOCK_ADDRESS;
 
-    struct SocketArgs {
-
-        SOCK_FAM family;
-        SOCK_TYPE type;
-        SOCK_PROTOCOL protocol;
-        std::string port;
-
-        SocketArgs(const SOCK_FAM family, const SOCK_TYPE type, const SOCK_PROTOCOL protocol, const std::string &port) : family(
-            family), type(type), protocol(protocol), port(port) {}
-
-    };
-
+    typedef std::string SOCK_PORT;
 
 
 }

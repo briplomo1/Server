@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <new>
+#include <vector>
 #include <ws2tcpip.h>
 
 /**
@@ -26,28 +27,31 @@ namespace Waiter::Networking {
 
 
     class Socket {
-        char buffer[BUFFER_SIZE];
-        // Arguments for defining and creating socket
-        SocketArgs sockArgs;
-        // unsigned 64 bit for modularity with win and *nix archs
-        SocketDescriptor sockets[];
-        // IP version agnostic structure holds socket address information
-        SOCKADDR_STORAGE sockAddr;
 
-        int status;
+        std::vector<char> recvBuffer; // Buffer to received data
+        std::vector<char> sendBuffer; // Buffer for send data
 
-        bool isReuseAddress;
+        // Socket properties defined by child classes. Defines the type of connection
+        SOCK_FAM addressFamily;
+        SOCK_TYPE socketType;
+        SOCK_PROTOCOL protocol = DEFAULT;
 
-        bool isNonBlocking;
-        /**
-         * Hints used to get host addresses
-         */
-        AddressInfo hints;
+        // User defined socket connection properties
+        SOCK_ADDRESS address;
+        SOCK_PORT port;
+
+        bool isDualStack;
+
         /**
          * Ptr to list of addresses found for host by call to {@link getaddrinfo}.
+         * IPV4 and IPV6 addresses if dull stack sockets is enabled.
          */
-        AddressInfo *addressList;
+        std::vector<AddressInfo> addresses;
 
+        // unsigned 64 bit for modularity with win and *nix architectures
+        std::vector<SocketDescriptor> sockets;
+        // IP version agnostic structure holds socket address information
+        SOCKADDR_STORAGE sockAddr;
 
 
 #ifdef _WIN32
@@ -56,10 +60,10 @@ namespace Waiter::Networking {
 
     public:
         // Non-implicit conversion constructor
-        explicit Socket(SocketArgs args);
+        explicit Socket(const std::string &address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
 
         // Non exception throwing constructor. Terminates process on failure
-        Socket(SocketArgs args, std::nothrow_t);
+        Socket(const std::string &address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
 
         /**
          * Clean up resources. Will do common resource closing such as closing socket.
@@ -68,9 +72,10 @@ namespace Waiter::Networking {
         virtual ~Socket();
 
         /**
-         * Bind a socket to an IP address and port. Uses {@link SocketArgs} and a {@link port} to bind.
+         * Bind a socket to an IP address and port. Uses {@link SOCK_ADDRESS} and a {@link port} to bind.
          */
         int bindSocket(const std::string &address, const std::string &port);
+
 
         /**
          * Calling application will define socket type/protocol on which the listen implementation will depend.
@@ -78,19 +83,19 @@ namespace Waiter::Networking {
          */
         virtual int listen() = 0;
 
-        void setReuseAddress(bool value);
-
-        void setNonBlocking(bool value);
-
-        [[nodiscard]] SocketArgs getSockArgs() const ;
-
-        [[nodiscard]] SocketDescriptor getSockDescriptor() const ;
+        /**
+        * Return a vector of {@link SocketDescriptor}. Will return both an IPV6 and IPV4 address
+        * if dual stack sockets is enabled.
+        */
+        [[nodiscard]] std::vector<SocketDescriptor> getSockets() const;
 
     private:
+        static void getAddresses(AddressInfo *addressesReturn, const std::string &address, SOCK_FAM family,
+                                 SOCK_TYPE socketType, const std::string &port);
 
-        [[nodiscard]] int handleReceive(int client_socket) const ;
+        //[[nodiscard]] int handleReceive(int client_socket) const ;
 
-        [[nodiscard]] int handleSend(int client_socket) const ;
+        //[[nodiscard]] int handleSend(int client_socket) const ;
 
 
 
