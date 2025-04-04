@@ -213,9 +213,14 @@ namespace Waiter::Networking {
     /**
      * Makes use of {@link getaddrinfo} to retrieve all sockets which in turn uses {@link SOCK_FAM}, {@link SOCK_TYPE},
      * and a string network address to derive any applicable addresses.
+<<<<<<< HEAD
      * @param isDualStack the {@link SOCK_FAM} to use as hint to retrieve network addresses. Setting {}{@link IP_UNSPECIFIED} will populate {@link sockets} with the IPV4 and IPV6 equivalents
+=======
+     * @param family the {@link SOCK_FAM} to use as hint to retrieve network addresses. Setting {}{@link IP_UNSPECIFIED} will populate {@link sockets} with the IPV4 and IPV6 equivalents
+>>>>>>> 5aa1243 (start return addresses)
      * of the given address, thereby using a dual stack sockets. Internally will use IPV6 addresses always with a mapping to
      * a IPV4 address for addressing IPV4 socket addresses.
+     * TODO:
      */
     void Socket::getAddresses(const std::string &address, const SOCK_TYPE socketType, const std::string &port, const SOCK_FAM family=IPV4) {
         AddressInfo hints = {};
@@ -224,9 +229,16 @@ namespace Waiter::Networking {
         hints.ai_socktype = socketType;
         hints.ai_flags = AI_NUMERICHOST | AI_PASSIVE; // TODO: AI_PASSIVE only for server
         if (getaddrinfo(address.data(), port.data(), &hints, &addressesReturn) < 0) {
-            std::cerr << "Get addresses for supplied address failed: " << std::endl;
+            std::cerr << "Get addresses for supplied address hints failed: " << std::endl;
         }
-        addressesReturn->ai_next = addressesReturn;
+
+        while (addressesReturn) {
+            addresses.emplace_back(*addressesReturn);
+            std::cout << "Address family: " << addressesReturn->ai_family << "\nAddress: " << addressesReturn->ai_addr
+            << "\nSocket type: " << addressesReturn->ai_socktype << "\nProtocol: " << addressesReturn->ai_protocol << std::endl;
+            addressesReturn = addressesReturn->ai_next;
+        }
+        std::cout << "Addresses successfully found: " << addresses.size() << std::endl;
     }
 
     Socket::~Socket() {
