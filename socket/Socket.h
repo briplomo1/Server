@@ -40,19 +40,16 @@ namespace Waiter::Networking {
         SOCK_ADDRESS address;
         SOCK_PORT port;
 
-        bool isDualStack;
-
         /**
-         * Ptr to list of addresses found for host by call to {@link getaddrinfo}.
-         * IPV4 and IPV6 addresses if dull stack sockets is enabled.
+         * Vector of addresses found for host by call to {@link getaddrinfo}.
+         * Will contain IPV4 and IPV6 addresses if dull stack sockets is enabled.
+         * May contain more addresses if host has more than one network interface.
          */
         std::vector<AddressInfo> addresses;
-
         // unsigned 64 bit for modularity with win and *nix architectures
         std::vector<SocketDescriptor> sockets;
-        // IP version agnostic structure holds socket address information
-        SOCKADDR_STORAGE sockAddr;
-
+        // IP version agnostic structure specifies transport address for incoming connections
+        SOCKADDR_STORAGE connStorage;
 
 #ifdef _WIN32
         WSAData wsaData; // Use WSA DLL data when in windows
@@ -60,10 +57,10 @@ namespace Waiter::Networking {
 
     public:
         // Non-implicit conversion constructor
-        explicit Socket(const std::string &address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
+        explicit Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
 
         // Non exception throwing constructor. Terminates process on failure
-        Socket(const std::string &address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
+        Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
 
         /**
          * Clean up resources. Will do common resource closing such as closing socket.
@@ -90,8 +87,8 @@ namespace Waiter::Networking {
         [[nodiscard]] std::vector<SocketDescriptor> getSockets() const;
 
     private:
-        static void getAddresses(AddressInfo *addressesReturn, const std::string &address, SOCK_FAM family,
-                                 SOCK_TYPE socketType, const std::string &port);
+        static void getAddresses(AddressInfo* addressesReturn, const std::string& address, SOCK_TYPE socketType,
+                                 const std::string& port, SOCK_FAM family);
 
         //[[nodiscard]] int handleReceive(int client_socket) const ;
 

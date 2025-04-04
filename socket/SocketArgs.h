@@ -24,6 +24,7 @@ namespace Waiter::Networking {
         IPV4 = AF_INET,
         IPV6 = AF_INET6,
         IP_UNSPECIFIED = AF_UNSPEC,
+        IP_DUAL_STACK = PF_UNSPEC,
         BLUETOOTH =
         #ifdef linux
             AF_BLUETOOTH // Bluetooth socket type exclusive to linux
