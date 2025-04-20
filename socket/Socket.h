@@ -88,7 +88,7 @@ namespace Waiter::Networking {
 
     private:
 
-        void getAddresses(const std::string& address, SOCK_TYPE socketType, const std::string& port, SOCK_FAM family);
+        void getAddresses(const std::string& address, SOCK_TYPE socketType,     const std::string& port, SOCK_FAM family);
 
         //[[nodiscard]] int handleReceive(int client_socket) const ;
 
