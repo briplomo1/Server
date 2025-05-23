@@ -25,18 +25,15 @@ namespace Waiter::Networking {
     typedef addrinfo AddressInfo;
     typedef uint64_t SocketDescriptor;
 
-
     class Socket {
 
         std::vector<char> recvBuffer; // Buffer to received data
         std::vector<char> sendBuffer; // Buffer for send data
 
-        // Socket properties defined by child classes. Defines the type of connection
+        // User defined socket connection properties
         SOCK_FAM addressFamily;
         SOCK_TYPE socketType;
         SOCK_PROTOCOL protocol = DEFAULT;
-
-        // User defined socket connection properties
         SOCK_ADDRESS address;
         SOCK_PORT port;
 
@@ -56,10 +53,22 @@ namespace Waiter::Networking {
 #endif
 
     public:
-        // Non-implicit conversion constructor
-        explicit Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
+        /**
+         * 
+         * @param address 
+         * @param addressFamily 
+         * @param socketType 
+         * @param socketProtocol 
+         */
+        Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
 
-        // Non exception throwing constructor. Terminates process on failure
+        /**
+         * Non exception throwing constructor. Will terminate process on failure.
+         * @param address 
+         * @param addressFamily 
+         * @param socketType 
+         * @param socketProtocol 
+         */
         Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
 
         /**
@@ -69,16 +78,39 @@ namespace Waiter::Networking {
         virtual ~Socket();
 
         /**
-         * Bind a socket to an IP address and port. Uses {@link SOCK_ADDRESS} and a {@link port} to bind.
+         * Specific to server sockets
+         * Given a file descriptor, associate or bind the socket file descriptor with a port and address.
+         * Is only
+         * @param address The address to bind to
+         * @param port The port number to bind too
          */
-        int bindSocket(const std::string &address, const std::string &port);
-
+        void bindSocket(const std::string &address, const std::string &port);
 
         /**
-         * Calling application will define socket type/protocol on which the listen implementation will depend.
-         * @return
+         * Specific to client socket
+         * @param address 
+         * @param port 
          */
-        virtual int listen() = 0;
+        void connectSocket(const std::string &address, const std::string &port);
+
+        /**
+         * Specific to server socket
+         */
+        void acceptConnection();
+
+        /**
+         *
+         * @param client_socket 
+         * @return 
+         */
+        [[nodiscard]] std::vector<char> receive(int client_socket) const ;
+
+        /**
+         * 
+         * @param client_socket 
+         * @return 
+         */
+        [[nodiscard]] std::vector<char> send(int client_socket) const ;
 
         /**
         * Return a vector of {@link SocketDescriptor}. Will return both an IPV6 and IPV4 address
@@ -86,13 +118,7 @@ namespace Waiter::Networking {
         */
         [[nodiscard]] std::vector<SocketDescriptor> getSockets() const;
 
-    private:
-
-        void getAddresses(const std::string& address, SOCK_TYPE socketType,     const std::string& port, SOCK_FAM family);
-
-        //[[nodiscard]] int handleReceive(int client_socket) const ;
-
-        //[[nodiscard]] int handleSend(int client_socket) const ;
+        void getAddresses(const std::string& address, SOCK_TYPE socketType, const std::string& port, SOCK_FAM family);
 
 
 
