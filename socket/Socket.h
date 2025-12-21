@@ -2,10 +2,9 @@
 // Created by b1n4r33 on 3/10/25.
 //
 
-#ifndef SOCKET_H
-#define SOCKET_H
+#pragma once
 
-#define BUFFER_SIZE 1028
+#define BUFFER_SIZE 1024
 #define DEFAULT_ADDRESS "127.0.0.1"
 #define DEFAULT_PORT "8000"
 
@@ -14,7 +13,28 @@
 #include <memory>
 #include <new>
 #include <vector>
-#include <ws2tcpip.h>
+
+
+#ifdef _WIN32
+    #include <ws2tcpip.h>
+
+    #define INVALID_SOCK INVALID_SOCKET
+    #define SOCK_ERROR SOCKET_ERROR
+#else
+
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netdb.h>
+    #include <unistd.h>
+    #include <errno.h>
+
+    #define INVALID_SOCK (-1)
+    #define SOCK_ERROR (-1)
+#endif
+
+
+
+
 
 /**
  * What properties and methods are common to all socket and protocol types will be implemented in this SScoetk class.
@@ -23,19 +43,22 @@
 namespace Waiter::Networking {
 
     typedef addrinfo AddressInfo;
-    typedef uint64_t SocketDescriptor;
+    #ifdef _WIN32
+    typedef SOCKET SocketDescriptor;
+    #else
+    typedef int SocketDescriptor;
+    #endif
 
     class Socket {
-
-        std::vector<char> recvBuffer; // Buffer to received data
-        std::vector<char> sendBuffer; // Buffer for send data
-
         // User defined socket connection properties
         SOCK_FAM addressFamily;
         SOCK_TYPE socketType;
-        SOCK_PROTOCOL protocol = DEFAULT;
+        SOCK_PROTOCOL socketProtocol = DEFAULT;
         SOCK_ADDRESS address;
         SOCK_PORT port;
+
+        // Socket file descriptor
+        SocketDescriptor socketDescriptor;
 
         /**
          * Vector of addresses found for host by call to {@link getaddrinfo}.
@@ -43,33 +66,38 @@ namespace Waiter::Networking {
          * May contain more addresses if host has more than one network interface.
          */
         std::vector<AddressInfo> addresses;
-        // unsigned 64 bit for modularity with win and *nix architectures
-        std::vector<SocketDescriptor> sockets;
-        // IP version agnostic structure specifies transport address for incoming connections
-        SOCKADDR_STORAGE connStorage;
-
-#ifdef _WIN32
-        WSAData wsaData; // Use WSA DLL data when in windows
-#endif
 
     public:
+
         /**
-         * 
-         * @param address 
-         * @param addressFamily 
-         * @param socketType 
-         * @param socketProtocol 
+         * Socket should not be copied
          */
-        Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol);
+        Socket(const Socket&) = delete;
+
+        /**
+         * Socket should not be copied
+         */
+        Socket& operator=(const Socket&) = delete;
+
+        /**
+         * Move constructor
+         *
+         */
+        Socket(Socket&&) noexcept;
+
+        /**
+         * Move assignment operator
+         * @return
+         */
+        Socket& operator=(Socket&&) noexcept;
 
         /**
          * Non exception throwing constructor. Will terminate process on failure.
-         * @param address 
          * @param addressFamily 
          * @param socketType 
          * @param socketProtocol 
          */
-        Socket(std::string address, SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
+        Socket(SOCK_FAM addressFamily, SOCK_TYPE socketType, SOCK_PROTOCOL socketProtocol, std::nothrow_t);
 
         /**
          * Clean up resources. Will do common resource closing such as closing socket.
@@ -94,7 +122,8 @@ namespace Waiter::Networking {
         void connectSocket(const std::string &address, const std::string &port);
 
         /**
-         * Specific to server socket
+         * Specific to server socket.
+         * Accepts an incoming connection.
          */
         void acceptConnection();
 
@@ -127,4 +156,4 @@ namespace Waiter::Networking {
 }
 
 
-#endif //SOCKET_H
+
