@@ -5,7 +5,7 @@
 #include "WinSockManager.h"
 #include <iostream>
 
-namespace Waiter::Networking {
+namespace Waiter {
 
     void WinSockManager::initialize() {
         static WinSockManager WinSockManager;

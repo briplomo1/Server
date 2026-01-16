@@ -16,7 +16,7 @@
 
 
 
-namespace Waiter::Networking {
+namespace Waiter {
 
     class WinSockManager {
 
