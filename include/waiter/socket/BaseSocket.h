@@ -7,13 +7,12 @@
 #define BUFFER_SIZE 4096
 #include <functional>
 #include <iostream>
+#include <queue>
+#include <waiter/types.h>
+#include <waiter/endpoint/endpoint.h>
+#include <waiter/io/IOContext.h>
+#include <waiter/io/WinSockManager.h>
 
-#include "SocketTypes.h"
-#include <optional>
-
-#include "EventLoop.h"
-#include "WinSockManager.h"
-#include "endpoint/Endpoint.h"
 
 #ifdef _WIN32
     #include <ws2tcpip.h>
@@ -46,27 +45,21 @@ namespace Waiter {
     typedef int SocketDescriptor;
 #endif
 
-    template<ADDR_FAM AddressFamily, SOCK_TYPE SocketType, PROTOCOL Protocol, IP_TYPE IPType, bool IsServer>
+
+    template<ADDR_FAM AddressFamily, SOCK_TYPE SocketType, PROTOCOL Protocol, bool IsServer, bool IsDualStack=true>
     class BaseSocket {
 
-        static_assert(AddressFamily == IPV6 || AddressFamily == IPV4 || IPType == IP_TYPE::IPV4_ONLY,
-       "IPType can only be DUAL_STACK or IPV6_ONLY for IPv6 sockets. IPv4 sockets must use IPV4_ONLY.");
+        using EndpointType = Endpoint<AddressFamily, SocketType, Protocol, IsServer, IsDualStack>;
 
-        using EndpointType = Endpoint::InetEndpoint<AddressFamily, SocketType, Protocol, IPType, IsServer>;
+        EndpointType local_endpoint_;
+        EndpointType remote_endpoint_;
 
-        // Native socket handle
         SocketDescriptor fd;
 
-        // TODO: Should be smart pointers?
-        Endpoint::Endpoint endpoint_;
-        std::optional<Endpoint::Endpoint> remoteEndpoint_;
         std::queue<std::string> send_queue_;
         std::queue<std::string> recv_queue_;
 
-        // Is the socket interested in reading
         bool wants_read_;
-
-        // Is the socket interested in writing
         bool wants_write_;
 
         void setNoDelay() {
@@ -115,14 +108,13 @@ namespace Waiter {
 
         void configureIP() {
             if constexpr (AddressFamily == IPV6) {
-                consteval int opt = (IPType == IP_TYPE::DUAL_STACK) ? 0: 1;
-                    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<char*>(&opt), sizeof(opt));
+                constexpr int opt = IsDualStack ? 0: 1;
+                    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&opt), sizeof(opt));
             }
         }
 
         void bindIfServer() {
-            if constexpr (IsServer)
-            {
+            if constexpr (IsServer) {
                 // TODO: bind address from endpoint
             }
         }
@@ -138,9 +130,7 @@ namespace Waiter {
 
     protected:
 
-        BaseSocket()
-        : fd(INVALID_SOCK), wants_read_(false), wants_write_(false) {
-
+        BaseSocket() : local_endpoint_(EndpointType{}), remote_endpoint_(), fd(INVALID_SOCK), wants_read_(false), wants_write_(false) {
             // Initialize WinSock if WINDOWS
             WinSockManager::initialize();
 
@@ -158,7 +148,8 @@ namespace Waiter {
             configureIP();
             bindIfServer();
 
-            std::cout << "Socket created" << std::endl;
+            std::cout << "Socket created: " << fd << std::endl;
+            //IOContext<IOPoller>::instance().register_socket(*this);
         }
 
         /**
@@ -229,11 +220,38 @@ namespace Waiter {
 
         }
 
+        /**
+         *  To be called by managing code if error occurs on socket operation. Will call hook
+         *  {@link handle_error} implementation.
+         */
+        void on_error() {
+            handle_error();
+        }
+
+        /**
+         *  Shutdown socket and release resources with call to close
+         */
+        void close_socket() {
+        #ifdef _WIN32
+            shutdown(fd, SD_BOTH);
+            closesocket(fd);
+            std::cout << "Socket destroyed: " << fd << std::endl;
+        #else
+            shutdown(fd, SHUT_RDWR);
+            close(fd);
+        #endif
+            //IOContext<>::instance().deregister_socket(*this);
+        }
+
     public:
 
         // No copies of BaseSocket
         BaseSocket(const BaseSocket&) = delete;
+
         BaseSocket& operator=(const BaseSocket&) = delete;
+
+        // No move assignment
+        BaseSocket& operator=(BaseSocket&&) noexcept = delete;
 
         /**
          * Move constructor moves most resources into current {@link BaseSocket} instance from other
@@ -241,9 +259,9 @@ namespace Waiter {
          * @param other The {@link BaseSocket} that is to be moved.
          */
         BaseSocket(BaseSocket&& other) noexcept
-        : fd(other.fd),
-        endpoint_(std::move(other.endpoint_)),
-        remoteEndpoint_(std::move(other.remoteEndpoint_)),
+        : local_endpoint_(std::move(other.local_endpoint_)),
+        remote_endpoint_(std::move(other.remote_endpoint_)),
+        fd(other.fd),
         send_queue_(std::move(other.send_queue_)),
         recv_queue_(std::move(other.recv_queue_)),
         wants_read_(other.wants_read_),
@@ -251,8 +269,28 @@ namespace Waiter {
             other.fd = INVALID_SOCK;
         }
 
-        // No move assignment
-        BaseSocket& operator=(BaseSocket&&) noexcept = delete;
+        void connect_remote(const EndpointType& endpoint)  requires (SocketType == DATAGRAM && !IsServer) {
+
+            if (connect(fd, remote_endpoint_.data(), remote_endpoint_.size()) == SOCKET_ERROR) {
+                perror("connect failed");
+                throw std::runtime_error("Socket connect failed");
+            }
+            remote_endpoint_ = endpoint;
+        }
+
+        void listen_on(int backlog = 100) requires (SocketType == STREAM && IsServer) {
+            if (listen(fd, backlog) == SOCK_ERROR) {
+                perror("listen failed");
+                throw std::runtime_error("Socket listen failed");
+            }
+        }
+
+        // TODO: can datagram accept connection?
+        BaseSocket* accept_connection() requires (SocketType == STREAM && IsServer) {
+            SocketDescriptor client_fd;
+            AddressStorage client_addr{};
+            socklen_t cient_socklen = sizeof(client_addr);
+        }
 
         /**
          * Exposes internal state of {@link BaseSocket} representing its interest to read
@@ -261,7 +299,7 @@ namespace Waiter {
          *
          * @return Returns boolean representing if socket desires to read data
          */
-        bool wants_read() const { return wants_read_; }
+        [[nodiscard]] bool wants_read() const { return wants_read_; }
 
         /**
          * Exposes internal state of {@link BaseSocket} representing its interest to write
@@ -270,7 +308,7 @@ namespace Waiter {
          *
          * @return Returns boolean representing if socket desires to write data
          */
-        bool wants_write() const { return wants_write_; }
+        [[nodiscard]] bool wants_write() const { return wants_write_; }
 
         /**
          * Sets the internal state of {@link BaseSocket} representing its desire to read
@@ -284,7 +322,7 @@ namespace Waiter {
          * data through an IO operation. Is to be set to true any time a write/send operation
          * needs to take place, and to false when no write operation needs to take place.
          */
-        void set_write(const bool b) {  wants_read_ = b; }
+        void set_write(const bool b) {  wants_write_ = b; }
 
         /**
          *  Hook to be called when messages are available in {@link recv_queue_}.
@@ -309,22 +347,15 @@ namespace Waiter {
          * flags/options on socket.
          * @return The native system's socket descriptor for raw usage.
          */
-        SocketDescriptor getSocket() const { return fd; }
+        [[nodiscard]] SocketDescriptor get_socket() const { return fd; }
 
         /**
          *  Virtual destructor does socket resource cleanup. Implementation will do
          *  protocol/application specific cleanup and resource management.
          */
         virtual ~BaseSocket() {
-#ifdef _WIN32
-            shutdown(fd, SD_BOTH);
-            closesocket(fd);
-#else
-            shutdown(fd, SHUT_RDWR);
-            close(fd);
-#endif
+            close_socket();
         }
-
 
     };
 

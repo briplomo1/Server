@@ -2,7 +2,7 @@
 // Created by bripl on 1/8/2026.
 //
 
-#include "EventLoop.h"
+#include "waiter/io/EventLoop.h"
 
 namespace Waiter
 {

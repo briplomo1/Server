@@ -25,7 +25,7 @@ namespace Waiter {
     /**
      * The underlying networking protocol.
      */
-    enum ADDR_FAM {
+    enum ADDR_FAM: int {
         IPV4 = AF_INET,
         IPV6 = AF_INET6,
         IP_ANY = AF_UNSPEC,
@@ -43,8 +43,8 @@ namespace Waiter {
      * The socket type. Defines communication protocol.
      */
     enum SOCK_TYPE: int {
-        TCP = SOCK_STREAM,
-        UDP = SOCK_DGRAM,
+        STREAM = SOCK_STREAM,
+        DATAGRAM = SOCK_DGRAM,
         RAW = SOCK_RAW,
     };
 
@@ -56,15 +56,22 @@ namespace Waiter {
         DEFAULT = 0,
     };
 
-    enum class IP_TYPE: int {
-        IPV4_ONLY,
-        IPV6_ONLY,
-        DUAL_STACK,
+
+    enum EVENT: uint32_t {
+        NONE = 0,
+        EVENT_READ = 1 << 0,
+        EVENT_WRITE = 1 << 1,
+        EVENT_ERROR = 1 << 2,
+        HUP = 1 << 3,
     };
 
-    enum class SocketResult {
+    inline EVENT operator|(const EVENT a, const EVENT b) {
+        return static_cast<EVENT>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    }
 
-    };
-
+    inline EVENT operator&(const EVENT a, const EVENT b)
+    {
+        return static_cast<EVENT>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+    }
 }
 
