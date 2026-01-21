@@ -1,7 +1,7 @@
 //
 // Created by bripl on 1/2/2026.
 //
-#include <Waiter/waiter.h>
+#include <waiter/waiter.h>
 
 
 

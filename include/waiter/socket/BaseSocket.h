@@ -33,7 +33,7 @@
 
 
 /**
- * What properties and methods are common to all socket and protocol types will be implemented in this SScoetk class.
+ * What properties and methods are common to all socket and protocol types will be implemented in this Socket class.
  * Specific protocols and socket types will extend virtual methods
  */
 namespace Waiter {
@@ -289,7 +289,17 @@ namespace Waiter {
         BaseSocket* accept_connection() requires (SocketType == STREAM && IsServer) {
             SocketDescriptor client_fd;
             AddressStorage client_addr{};
-            socklen_t cient_socklen = sizeof(client_addr);
+            socklen_t client_socklen = sizeof(client_addr);
+
+            client_fd = ::accept(fd, reinterpret_cast<sockaddr*>(&client_addr), &client_socklen);
+            if (client_fd == INVALID_SOCK) {
+                perror("accept failed");
+                throw std::runtime_error("accept failed");
+            }
+
+            BaseSocket client;
+
+
         }
 
         /**
@@ -310,37 +320,37 @@ namespace Waiter {
          */
         [[nodiscard]] bool wants_write() const { return wants_write_; }
 
-        /**
-         * Sets the internal state of {@link BaseSocket} representing its desire to read
-         * data through an IO operation. Is to be set any time a read/recv operation
-         * needs to take place, and to false when no read operation needs to take place.
-         */
-        void set_read(const bool b) {  wants_read_ = b; }
-
-        /**
-         * Sets the internal state of {@link BaseSocket} representing its desire to write
-         * data through an IO operation. Is to be set to true any time a write/send operation
-         * needs to take place, and to false when no write operation needs to take place.
-         */
-        void set_write(const bool b) {  wants_write_ = b; }
-
-        /**
-         *  Hook to be called when messages are available in {@link recv_queue_}.
-         *  Implementation will be protocol/application specific to handle received messages.
-         */
-        void virtual handle_read() = 0; // Handle messages in recv q
-
-        /**
-         *  Hook to be called when a IO error occurs in a {@link BaseSocket} operation.
-         *  Will handle protocol/application specific cleanup and error handling.
-         */
-        void virtual handle_error() = 0; // Protocol specific cleanup triggered on error
-
-        /**
-         * Hook to be called after data is sent successfully.
-         * May be optional or mandatory depending on protocol/application.
-         */
-        void virtual handle_write() = 0; // Hook after send is done
+        // /**
+        //  * Sets the internal state of {@link BaseSocket} representing its desire to read
+        //  * data through an IO operation. Is to be set any time a read/recv operation
+        //  * needs to take place, and to false when no read operation needs to take place.
+        //  */
+        // void set_read(const bool b) {  wants_read_ = b; }
+        //
+        // /**
+        //  * Sets the internal state of {@link BaseSocket} representing its desire to write
+        //  * data through an IO operation. Is to be set to true any time a write/send operation
+        //  * needs to take place, and to false when no write operation needs to take place.
+        //  */
+        // void set_write(const bool b) {  wants_write_ = b; }
+        //
+        // /**
+        //  *  Hook to be called when messages are available in {@link recv_queue_}.
+        //  *  Implementation will be protocol/application specific to handle received messages.
+        //  */
+        // void virtual handle_read() = 0; // Handle messages in recv q
+        //
+        // /**
+        //  *  Hook to be called when a IO error occurs in a {@link BaseSocket} operation.
+        //  *  Will handle protocol/application specific cleanup and error handling.
+        //  */
+        // void virtual handle_error() = 0; // Protocol specific cleanup triggered on error
+        //
+        // /**
+        //  * Hook to be called after data is sent successfully.
+        //  * May be optional or mandatory depending on protocol/application.
+        //  */
+        // void virtual handle_write() = 0; // Hook after send is done
 
         /**
          * Gets system native socket/file descriptor. Should rarely be used unless setting additional

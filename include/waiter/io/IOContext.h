@@ -52,7 +52,7 @@ namespace Waiter {
             start_loop();
         }
 
-        template<SocketLike T> // TODO: smart ptr?
+        template<SocketLike T>
         void deregister_socket(const T* socket) {
             poller_->remove(socket);
             sock_count.fetch_sub(1, std::memory_order_relaxed);
