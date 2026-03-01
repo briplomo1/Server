@@ -59,8 +59,8 @@ namespace Waiter {
         std::queue<std::string> send_queue_;
         std::queue<std::string> recv_queue_;
 
-        bool wants_read_;
-        bool wants_write_;
+        std::atomic<bool> wants_read_;
+        std::atomic<bool> wants_write_;
 
         void setNoDelay() {
             if (SocketType == SOCK_STREAM) {
@@ -130,7 +130,8 @@ namespace Waiter {
 
     protected:
 
-        BaseSocket() : local_endpoint_(EndpointType{}), remote_endpoint_(), fd(INVALID_SOCK), wants_read_(false), wants_write_(false) {
+        BaseSocket(EndpointType local_endpoint=EndpointType{}, EndpointType remote_endpoint=EndpointType{})
+        : local_endpoint_(local_endpoint), remote_endpoint_(remote_endpoint), fd(INVALID_SOCK), wants_read_(false), wants_write_(false) {
             // Initialize WinSock if WINDOWS
             WinSockManager::initialize();
 
@@ -286,7 +287,7 @@ namespace Waiter {
         }
 
         // TODO: can datagram accept connection?
-        BaseSocket* accept_connection() requires (SocketType == STREAM && IsServer) {
+        [[nodiscard]] BaseSocket* accept_connection() requires (SocketType == STREAM && IsServer) {
             SocketDescriptor client_fd;
             AddressStorage client_addr{};
             socklen_t client_socklen = sizeof(client_addr);
@@ -298,6 +299,7 @@ namespace Waiter {
             }
 
             BaseSocket client;
+            // TODO:
 
 
         }
@@ -309,7 +311,7 @@ namespace Waiter {
          *
          * @return Returns boolean representing if socket desires to read data
          */
-        [[nodiscard]] bool wants_read() const { return wants_read_; }
+        [[nodiscard]] bool wants_read() const { return wants_read_.load(std::memory_order_acquire); }
 
         /**
          * Exposes internal state of {@link BaseSocket} representing its interest to write
@@ -318,39 +320,46 @@ namespace Waiter {
          *
          * @return Returns boolean representing if socket desires to write data
          */
-        [[nodiscard]] bool wants_write() const { return wants_write_; }
+        [[nodiscard]] bool wants_write() const { return wants_write_.load(std::memory_order_acquire); }
 
-        // /**
-        //  * Sets the internal state of {@link BaseSocket} representing its desire to read
-        //  * data through an IO operation. Is to be set any time a read/recv operation
-        //  * needs to take place, and to false when no read operation needs to take place.
-        //  */
-        // void set_read(const bool b) {  wants_read_ = b; }
-        //
-        // /**
-        //  * Sets the internal state of {@link BaseSocket} representing its desire to write
-        //  * data through an IO operation. Is to be set to true any time a write/send operation
-        //  * needs to take place, and to false when no write operation needs to take place.
-        //  */
-        // void set_write(const bool b) {  wants_write_ = b; }
-        //
-        // /**
-        //  *  Hook to be called when messages are available in {@link recv_queue_}.
-        //  *  Implementation will be protocol/application specific to handle received messages.
-        //  */
-        // void virtual handle_read() = 0; // Handle messages in recv q
-        //
-        // /**
-        //  *  Hook to be called when a IO error occurs in a {@link BaseSocket} operation.
-        //  *  Will handle protocol/application specific cleanup and error handling.
-        //  */
-        // void virtual handle_error() = 0; // Protocol specific cleanup triggered on error
-        //
-        // /**
-        //  * Hook to be called after data is sent successfully.
-        //  * May be optional or mandatory depending on protocol/application.
-        //  */
-        // void virtual handle_write() = 0; // Hook after send is done
+        /**
+         * Sets the internal state of {@link BaseSocket} representing its desire to read
+         * data through an IO operation. Is to be set any time a read/recv operation
+         * needs to take place, and to false when no read operation needs to take place.
+         */
+        void set_read(const bool b) {  wants_read_.store(b, std::memory_order_release); }
+
+        /**
+         * Sets the internal state of {@link BaseSocket} representing its desire to write
+         * data through an IO operation. Is to be set to true any time a write/send operation
+         * needs to take place, and to false when no write operation needs to take place.
+         */
+        void set_write(const bool b) {  wants_write_.store(b, std::memory_order_release); }
+
+
+        /**
+         *  Hook to be called when messages are available in {@link recv_queue_}.
+         *  Implementation will be protocol/application specific to handle received messages.
+         */
+        void set_read_callback() {
+
+        }
+
+        /**
+         *  Hook to be called when a IO error occurs in a {@link BaseSocket} operation.
+         *  Will handle protocol/application specific cleanup and error handling.
+         */
+        void handle_error() {
+
+        }
+
+        /**
+         * Hook to be called after data is sent successfully.
+         * May be optional or mandatory depending on protocol/application.
+         */
+        void handle_write() {
+
+        }
 
         /**
          * Gets system native socket/file descriptor. Should rarely be used unless setting additional
